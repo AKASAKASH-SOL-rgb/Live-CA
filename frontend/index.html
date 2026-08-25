@@ -2,8 +2,17 @@
 <html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ExamPulse | Live Current Affairs for SSC, Railway & Bank</title>
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ExamPulse">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,8 +55,8 @@
             <div class="flex items-center justify-between h-16 gap-3">
                 
                 <!-- Logo & Branding -->
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('live-feed')">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 shrink-0">
                         <span class="text-xl font-extrabold">⚡</span>
                     </div>
                     <div>
@@ -55,8 +64,8 @@
                             <h1 class="text-lg font-black tracking-tight font-heading bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-300 bg-clip-text text-transparent">
                                 ExamPulse
                             </h1>
-                            <span class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-pulse"></span> LIVE FEEDS
+                            <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-pulse"></span> LIVE
                             </span>
                         </div>
                         <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase">
@@ -66,12 +75,18 @@
                 </div>
 
                 <!-- Live Status & Quick Action Buttons -->
-                <div class="flex items-center gap-2 sm:gap-3">
+                <div class="flex items-center gap-2">
                     
+                    <!-- Install App PWA Button -->
+                    <button id="install-app-btn" onclick="installPWA()" 
+                        class="hidden px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-extrabold transition-fluid shadow-md flex items-center gap-1.5 animate-bounce">
+                        📱 <span>Install App</span>
+                    </button>
+
                     <!-- Sync Button -->
                     <button id="sync-live-btn" onclick="handleLiveSync()" 
-                        class="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700 text-xs font-bold transition-fluid flex items-center gap-1.5 shadow-sm">
-                        🔄 <span class="hidden sm:inline">Sync Live Feeds</span>
+                        class="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700 text-xs font-bold transition-fluid flex items-center gap-1.5 shadow-sm">
+                        🔄 <span class="hidden md:inline">Sync Live Feeds</span>
                     </button>
 
                     <!-- Theme Toggle Button -->
@@ -88,29 +103,29 @@
                 <!-- Main Layer Switcher -->
                 <nav class="flex items-center gap-1.5 shrink-0">
                     <button onclick="switchTab('live-feed')" data-tab="live-feed" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-md transition-fluid flex items-center gap-1.5">
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-md transition-fluid flex items-center gap-1.5">
                         📰 <span>Daily Live Feed</span>
                     </button>
                     <button onclick="switchTab('one-liners')" data-tab="one-liners" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
                         ⚡ <span>Exam Crux</span>
                     </button>
                     <button onclick="switchTab('saved-deck')" data-tab="saved-deck" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
                         ⭐ <span>Revision Deck</span>
                         <span id="deck-count-badge" class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-white">0</span>
                     </button>
                     <button onclick="switchTab('notepad')" data-tab="notepad" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
                         📓 <span>Study Notepad</span>
                     </button>
                     <button onclick="switchTab('quiz')" data-tab="quiz" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
                         🎯 <span>Daily Quiz</span>
                     </button>
                     <button onclick="switchTab('static-gk')" data-tab="static-gk" 
-                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
-                        🏛️ <span>Static GK Capsules</span>
+                        class="nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        🏛️ <span>Static GK</span>
                     </button>
                 </nav>
 
@@ -118,19 +133,19 @@
                 <div class="flex items-center gap-1.5 shrink-0">
                     <span class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">Target:</span>
                     <button onclick="setExamFilter('all')" data-exam="all" 
-                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md transition-fluid">
+                        class="exam-filter-btn px-3 py-1 rounded-full text-xs font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md transition-fluid">
                         All Exams
                     </button>
                     <button onclick="setExamFilter('ssc')" data-exam="ssc" 
-                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
-                        🏆 SSC (CGL/CHSL)
+                        class="exam-filter-btn px-3 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        🏆 SSC (CGL)
                     </button>
                     <button onclick="setExamFilter('railway')" data-exam="railway" 
-                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
-                        🚆 Railways (RRB)
+                        class="exam-filter-btn px-3 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        🚆 Railway (RRB)
                     </button>
                     <button onclick="setExamFilter('banking')" data-exam="banking" 
-                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        class="exam-filter-btn px-3 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
                         🏦 Banking (IBPS/SBI)
                     </button>
                 </div>
@@ -368,7 +383,44 @@
         </div>
     </footer>
 
-    <!-- Scripts -->
+    <!-- Service Worker Registration & PWA install prompt script -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('PWA Service Worker registered:', reg.scope))
+                    .catch(err => console.log('SW registration error:', err));
+            });
+        }
+
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('install-app-btn');
+            if (installBtn) {
+                installBtn.classList.remove('hidden');
+            }
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        showToast('Thank you for installing ExamPulse App! 🚀');
+                        const installBtn = document.getElementById('install-app-btn');
+                        if (installBtn) installBtn.classList.add('hidden');
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                showToast('To install: Tap browser menu (⋮ or Share) -> "Add to Home Screen / Install App"');
+            }
+        }
+    </script>
+
+    <!-- App Scripts -->
     <script src="/static/js/api.js"></script>
     <script src="/static/js/notepad.js"></script>
     <script src="/static/js/quiz.js"></script>

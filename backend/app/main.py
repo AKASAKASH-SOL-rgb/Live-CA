@@ -1,6 +1,8 @@
 import os
 import json
 import sqlite3
+import threading
+import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
@@ -23,7 +25,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for development
+# Enable CORS for development & cloud clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,16 +34,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# App startup: initialize database and populate starter facts
+def background_periodic_sync():
+    """Periodically fetches latest current affairs every 2 hours in the cloud."""
+    while True:
+        try:
+            time.sleep(7200) # 2 hours
+            print("[Auto-Scheduler] Running automatic 2-hour live current affairs sync...")
+            sync_all_sources()
+        except Exception as e:
+            print(f"[Auto-Scheduler] Periodic sync notice: {e}")
+
+# App startup: initialize database, load starter data, and trigger live sync
 @app.on_event("startup")
 def on_startup():
     init_db()
     populate_starter_data()
-    # Trigger an initial live sync in the background or right away
-    try:
-        sync_all_sources()
-    except Exception as e:
-        print(f"[Startup] Initial sync notice: {e}")
+    
+    # Run initial live sync in a separate thread on startup
+    threading.Thread(target=sync_all_sources, daemon=True).start()
+    
+    # Start periodic background refresher thread
+    threading.Thread(target=background_periodic_sync, daemon=True).start()
 
 # Static file serving
 FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
@@ -84,8 +97,8 @@ def get_status():
     }
 
 @app.post("/api/sync")
-def trigger_sync(background_tasks: BackgroundTasks):
-    """Triggers real-time live scrape from all sources."""
+def trigger_sync():
+    """Triggers real-time live scrape from all sources instantly."""
     res = sync_all_sources()
     return {"message": "Sync completed successfully", "details": res}
 
@@ -98,7 +111,7 @@ def get_articles(
     source: Optional[str] = Query(None, description="Source ID e.g. gktoday"),
     search: Optional[str] = Query(None, description="Search keyword"),
     date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    limit: int = 50,
+    limit: int = 60,
     offset: int = 0
 ):
     conn = get_db_connection()
@@ -235,7 +248,6 @@ def save_bookmark(data: BookmarkCreate):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Check article exists
     cursor.execute("SELECT * FROM articles WHERE id = ?", (data.article_id,))
     art = cursor.fetchone()
     if not art:
