@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamPulse | Live Current Affairs for SSC, Railway & Bank</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Fluid Navigation & Header -->
+    <header class="sticky top-0 z-40 glass-nav transition-fluid">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 gap-3">
+                
+                <!-- Logo & Branding -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <span class="text-xl font-extrabold">⚡</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-black tracking-tight font-heading bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-300 bg-clip-text text-transparent">
+                                ExamPulse
+                            </h1>
+                            <span class="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 live-pulse"></span> LIVE FEEDS
+                            </span>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase">
+                            SSC • Railway • Banking 2-3 Linear Portal
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Live Status & Quick Action Buttons -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    
+                    <!-- Sync Button -->
+                    <button id="sync-live-btn" onclick="handleLiveSync()" 
+                        class="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-slate-700 text-xs font-bold transition-fluid flex items-center gap-1.5 shadow-sm">
+                        🔄 <span class="hidden sm:inline">Sync Live Feeds</span>
+                    </button>
+
+                    <!-- Theme Toggle Button -->
+                    <button onclick="toggleTheme()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid text-sm" title="Toggle Dark/Light Mode">
+                        <span id="theme-toggle-icon">🌙</span>
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Layer Navigation Tabs & Exam Filter Bar -->
+            <div class="py-2.5 border-t border-slate-200/60 dark:border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-x-auto">
+                
+                <!-- Main Layer Switcher -->
+                <nav class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="switchTab('live-feed')" data-tab="live-feed" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-md transition-fluid flex items-center gap-1.5">
+                        📰 <span>Daily Live Feed</span>
+                    </button>
+                    <button onclick="switchTab('one-liners')" data-tab="one-liners" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        ⚡ <span>Exam Crux</span>
+                    </button>
+                    <button onclick="switchTab('saved-deck')" data-tab="saved-deck" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        ⭐ <span>Revision Deck</span>
+                        <span id="deck-count-badge" class="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-white">0</span>
+                    </button>
+                    <button onclick="switchTab('notepad')" data-tab="notepad" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        📓 <span>Study Notepad</span>
+                    </button>
+                    <button onclick="switchTab('quiz')" data-tab="quiz" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        🎯 <span>Daily Quiz</span>
+                    </button>
+                    <button onclick="switchTab('static-gk')" data-tab="static-gk" 
+                        class="nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5">
+                        🏛️ <span>Static GK Capsules</span>
+                    </button>
+                </nav>
+
+                <!-- Exam Target Filter Pills -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">Target:</span>
+                    <button onclick="setExamFilter('all')" data-exam="all" 
+                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md transition-fluid">
+                        All Exams
+                    </button>
+                    <button onclick="setExamFilter('ssc')" data-exam="ssc" 
+                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        🏆 SSC (CGL/CHSL)
+                    </button>
+                    <button onclick="setExamFilter('railway')" data-exam="railway" 
+                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        🚆 Railways (RRB)
+                    </button>
+                    <button onclick="setExamFilter('banking')" data-exam="banking" 
+                        class="exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid">
+                        🏦 Banking (IBPS/SBI)
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dynamic Application Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ==================== TAB 1: DAILY LIVE STREAM ==================== -->
+        <section id="view-live-feed" class="tab-content-view">
+            
+            <!-- Filter & Search Toolbar -->
+            <div class="glass-card rounded-2xl p-4 mb-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+                
+                <!-- Search Input -->
+                <div class="relative w-full md:w-96">
+                    <input id="search-input" type="text" placeholder="Search current affairs, schemes, appointments, acts..." 
+                        class="w-full pl-9 pr-4 py-2 rounded-xl text-xs bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400" />
+                    <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                </div>
+
+                <!-- Dropdown Filters -->
+                <div class="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                    
+                    <!-- Category Selector -->
+                    <select id="category-filter" class="w-full sm:w-auto px-3 py-2 rounded-xl text-xs bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                        <option value="All Categories">📂 All Categories</option>
+                        <option value="Banking & Economy">🏦 Banking & Economy</option>
+                        <option value="National & Governance">🏛️ National & Governance</option>
+                        <option value="International & Summits">🌐 International & Summits</option>
+                        <option value="Appointments & Resignations">👔 Appointments & Persons</option>
+                        <option value="Defence, Science & Space">🚀 Defence & Science</option>
+                        <option value="Schemes & Initiatives">📜 Schemes & Portals</option>
+                        <option value="Awards & Honours">🏅 Awards & Honours</option>
+                        <option value="Sports & Games">🏆 Sports & Games</option>
+                        <option value="Important Days & Themes">📅 Important Days & Themes</option>
+                        <option value="Environment & Ecology">🌿 Environment & Ecology</option>
+                    </select>
+
+                    <!-- Source Selector -->
+                    <select id="source-filter" class="w-full sm:w-auto px-3 py-2 rounded-xl text-xs bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                        <option value="all">📰 All Reputed Sources</option>
+                        <option value="gktoday">⭐ GKToday (Primary Focus)</option>
+                        <option value="drishti">Drishti IAS</option>
+                        <option value="thehindu_national">The Hindu (National)</option>
+                        <option value="thehindu_business">The Hindu (Business)</option>
+                        <option value="economic_times">Economic Times</option>
+                        <option value="times_of_india">Times of India</option>
+                    </select>
+
+                </div>
+            </div>
+
+            <!-- Feed Statistics Bar -->
+            <div class="flex items-center justify-between mb-4 px-1 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span>Exam-Oriented 2-3 Linear Points • Real-time Distilled Feed</span>
+                </span>
+                <span id="total-articles-count">Loading...</span>
+            </div>
+
+            <!-- Dynamic Articles Feed Container -->
+            <div id="articles-feed">
+                <!-- Articles dynamically injected by app.js -->
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: EXAM CRUX (ONE-LINERS) ==================== -->
+        <section id="view-one-liners" class="tab-content-view hidden">
+            <div id="one-liners-container">
+                <!-- Injected by app.js -->
+            </div>
+        </section>
+
+        <!-- ==================== TAB 3: SAVED REVISION DECK ==================== -->
+        <section id="view-saved-deck" class="tab-content-view hidden">
+            <div id="bookmarks-container">
+                <!-- Injected by app.js -->
+            </div>
+        </section>
+
+        <!-- ==================== TAB 4: STUDY NOTEPAD ==================== -->
+        <section id="view-notepad" class="tab-content-view hidden h-[calc(100vh-210px)] min-h-[500px]">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 h-full">
+                
+                <!-- Left Notes Directory Sidebar (4 Cols) -->
+                <div class="md:col-span-4 glass-card rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 flex flex-col h-full overflow-hidden shadow-sm">
+                    
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base font-extrabold font-heading text-slate-900 dark:text-slate-100">Study Scratchpad</span>
+                        </div>
+                        <button onclick="window.notepad.createNewNote()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-fluid flex items-center gap-1">
+                            + New Note
+                        </button>
+                    </div>
+
+                    <!-- Search Notes -->
+                    <div class="mb-3">
+                        <input type="text" placeholder="Filter notes by title or keyword..." 
+                            oninput="window.notepad.searchTerm = this.value; window.notepad.renderNotesList()"
+                            class="w-full px-3 py-1.5 text-xs bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-slate-400" />
+                    </div>
+
+                    <!-- Notes List -->
+                    <div id="notepad-list" class="flex-1 overflow-y-auto pr-1">
+                        <!-- Rendered by notepad.js -->
+                    </div>
+                </div>
+
+                <!-- Right Note Editor Area (8 Cols) -->
+                <div id="notepad-editor-area" class="md:col-span-8 h-full">
+                    <!-- Rendered by notepad.js -->
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== TAB 5: DAILY PRACTICE QUIZ (MCQs) ==================== -->
+        <section id="view-quiz" class="tab-content-view hidden">
+            <div id="quiz-container">
+                <!-- Rendered by quiz.js -->
+            </div>
+        </section>
+
+        <!-- ==================== TAB 6: STATIC GK CAPSULES ==================== -->
+        <section id="view-static-gk" class="tab-content-view hidden">
+            <div class="mb-6 text-center max-w-2xl mx-auto">
+                <h2 class="text-xl font-extrabold font-heading text-slate-900 dark:text-slate-100 mb-1">
+                    🏛️ High-Yield Static GK Capsules
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Essential Static GK reference tables frequently asked in SSC CGL, RRB NTPC, and IBPS/SBI exams.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <!-- Capsule 1: Financial & Regulatory Bodies -->
+                <div class="glass-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover-lift transition-fluid">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">🏦</span>
+                        <h3 class="text-sm font-extrabold text-slate-900 dark:text-slate-100">Financial & Regulatory HQs</h3>
+                    </div>
+                    <ul class="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">RBI (Reserve Bank)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Mumbai (1935)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">SEBI (Securities Board)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Mumbai (1992)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">NABARD (Agriculture)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Mumbai (1982)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">SIDBI (Small Industries)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Lucknow (1990)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">IRDAI (Insurance)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Hyderabad (1999)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Capsule 2: Defense & Science Establishments -->
+                <div class="glass-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover-lift transition-fluid">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">🚀</span>
+                        <h3 class="text-sm font-extrabold text-slate-900 dark:text-slate-100">Defence & Science Centers</h3>
+                    </div>
+                    <ul class="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">ISRO Satellite Launch</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">SDSC Sriharikota</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">DRDO Head Office</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">DRDO Bhawan, New Delhi</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">BARC (Atomic Research)</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Trombay, Mumbai</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">CSIR Headquarters</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">New Delhi (1942)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Capsule 3: Indian Railways Static GK -->
+                <div class="glass-card p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover-lift transition-fluid">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">🚆</span>
+                        <h3 class="text-sm font-extrabold text-slate-900 dark:text-slate-100">Railways Key Milestones</h3>
+                    </div>
+                    <ul class="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">First Passenger Train</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">1853 (Mumbai-Thane)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">First Electric Train</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">1925 (Deccan Queen)</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">Total Railway Zones</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">18 Railway Zones</span>
+                        </li>
+                        <li class="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex justify-between">
+                            <span class="font-bold">Kavach System</span>
+                            <span class="font-mono text-indigo-600 dark:text-indigo-400">Developed by RDSO</span>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- App Footer -->
+    <footer class="mt-auto py-6 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 text-center text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>⚡ ExamPulse • Daily Live Current Affairs Aggregator (GKToday, Drishti IAS, The Hindu, ET, TOI)</span>
+            <span>Tailored for SSC CGL, RRB NTPC, and IBPS/SBI Bank Exams</span>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/notepad.js"></script>
+    <script src="/static/js/quiz.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
