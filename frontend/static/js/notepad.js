@@ -15,28 +15,60 @@ class NotepadManager {
     }
 
     async loadNotes() {
-        try {
-            const data = await window.api.getNotes();
-            this.notes = data.notes || [];
-            if (this.notes.length > 0 && !this.activeNoteId) {
-                this.activeNoteId = this.notes[0].id;
-            }
-        } catch (e) {
-            console.error('Failed to load notes:', e);
-            // Fallback to local storage
-            const local = localStorage.getItem('ca_exam_notes');
-            if (local) {
-                this.notes = JSON.parse(local);
-                if (this.notes.length > 0 && !this.activeNoteId) {
-                    this.activeNoteId = this.notes[0].id;
-                }
+        // 1. Always load local notes first as safe source of truth
+        const local = localStorage.getItem('ca_exam_notes');
+        if (local) {
+            try {
+                this.notes = JSON.parse(local) || [];
+            } catch (e) {
+                console.error('Local notes parse error:', e);
             }
         }
+
+        // 2. Fetch server notes and safely merge
+        try {
+            const data = await window.api.getNotes();
+            const serverNotes = data.notes || [];
+
+            if (serverNotes.length > 0) {
+                const localMap = new Map(this.notes.map(n => [n.id, n]));
+                for (const sNote of serverNotes) {
+                    if (!localMap.has(sNote.id)) {
+                        this.notes.push(sNote);
+                    } else {
+                        // Keep whichever is more recently updated
+                        const existing = localMap.get(sNote.id);
+                        if (new Date(sNote.updated_at) > new Date(existing.updated_at)) {
+                            Object.assign(existing, sNote);
+                        }
+                    }
+                }
+            } else if (this.notes.length > 0) {
+                // Server restarted / database is fresh; sync our local notes to server!
+                for (const n of this.notes) {
+                    window.api.createNote({
+                        title: n.title,
+                        content: n.content,
+                        tags: n.tags,
+                        color: n.color,
+                        is_pinned: n.is_pinned
+                    }).catch(() => {});
+                }
+            }
+        } catch (e) {
+            console.warn('Backend notes sync unavailable, running from local storage:', e);
+        }
+
+        if (this.notes.length > 0 && !this.activeNoteId) {
+            this.activeNoteId = this.notes[0].id;
+        }
+        this.saveToStorage();
     }
 
     async saveToStorage() {
         localStorage.setItem('ca_exam_notes', JSON.stringify(this.notes));
     }
+
 
     getActiveNote() {
         return this.notes.find(n => n.id === this.activeNoteId) || null;

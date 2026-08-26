@@ -23,7 +23,15 @@ class ArticleItem(BaseModel):
 
 class BookmarkCreate(BaseModel):
     article_id: str
+    title: Optional[str] = ""
+    category: Optional[str] = ""
+    source_name: Optional[str] = ""
+    bullets: Optional[List[str]] = []
+    static_gk: Optional[List[Dict[str, Any]]] = []
     user_notes: Optional[str] = ""
+    exam_targets: Optional[List[str]] = []
+    original_url: Optional[str] = ""
+    one_liner: Optional[str] = ""
 
 class BookmarkUpdate(BaseModel):
     user_notes: str

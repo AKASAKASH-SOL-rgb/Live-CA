@@ -38,16 +38,31 @@ const api = {
         return await res.json();
     },
 
-    async saveBookmark(articleId, userNotes = "") {
+    async saveBookmark(article, userNotes = "") {
+        const payload = (typeof article === 'string') 
+            ? { article_id: article, user_notes: userNotes } 
+            : {
+                article_id: article.id || article.article_id,
+                title: article.title,
+                category: article.category,
+                source_name: article.source_name,
+                bullets: article.bullets || [],
+                static_gk: article.static_gk || [],
+                user_notes: userNotes || article.user_note || article.user_notes || "",
+                exam_targets: article.exam_targets || [],
+                original_url: article.original_url || "",
+                one_liner: article.one_liner || ""
+            };
         const res = await fetch(`${API_BASE}/bookmarks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ article_id: articleId, user_notes: userNotes })
+            body: JSON.stringify(payload)
         });
         return await res.json();
     },
 
     async deleteBookmark(articleId) {
+
         const res = await fetch(`${API_BASE}/bookmarks/${articleId}`, { method: 'DELETE' });
         return await res.json();
     },

@@ -217,10 +217,7 @@ def get_bookmarks():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT b.*, a.original_url, a.one_liner 
-    FROM bookmarks b
-    LEFT JOIN articles a ON b.article_id = a.id
-    ORDER BY b.saved_at DESC
+    SELECT * FROM bookmarks ORDER BY saved_at DESC
     """)
     rows = cursor.fetchall()
     
@@ -236,8 +233,8 @@ def get_bookmarks():
             "static_gk": json.loads(r["static_gk"]) if r["static_gk"] else [],
             "user_notes": r["user_notes"] or "",
             "exam_targets": json.loads(r["exam_targets"]) if r["exam_targets"] else [],
-            "original_url": r["original_url"],
-            "one_liner": r["one_liner"],
+            "original_url": r["original_url"] or "",
+            "one_liner": r["one_liner"] or "",
             "saved_at": r["saved_at"]
         })
     conn.close()
@@ -250,31 +247,42 @@ def save_bookmark(data: BookmarkCreate):
     
     cursor.execute("SELECT * FROM articles WHERE id = ?", (data.article_id,))
     art = cursor.fetchone()
-    if not art:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Article not found")
-        
-    try:
-        cursor.execute("""
-        INSERT INTO bookmarks (article_id, title, category, source_name, bullets, static_gk, user_notes, exam_targets)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(article_id) DO UPDATE SET
-            user_notes = excluded.user_notes
-        """, (
-            art["id"],
-            art["title"],
-            art["category"],
-            art["source_name"],
-            art["bullets"],
-            art["static_gk"],
-            data.user_notes or "",
-            art["exam_targets"]
-        ))
-        conn.commit()
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=str(e))
-        
+    
+    title = data.title if data.title else (art["title"] if art else "Saved Current Affairs Fact")
+    category = data.category if data.category else (art["category"] if art else "General Awareness")
+    source_name = data.source_name if data.source_name else (art["source_name"] if art else "Live Feed")
+    
+    bullets = json.dumps(data.bullets) if data.bullets else (art["bullets"] if art else "[]")
+    static_gk = json.dumps(data.static_gk) if data.static_gk else (art["static_gk"] if art else "[]")
+    exam_targets = json.dumps(data.exam_targets) if data.exam_targets else (art["exam_targets"] if art else "[]")
+    original_url = data.original_url if data.original_url else (art["original_url"] if art else "")
+    one_liner = data.one_liner if data.one_liner else (art["one_liner"] if art else title)
+    
+    cursor.execute("""
+    INSERT INTO bookmarks (article_id, title, category, source_name, bullets, static_gk, user_notes, exam_targets, original_url, one_liner)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(article_id) DO UPDATE SET
+        title = excluded.title,
+        category = excluded.category,
+        source_name = excluded.source_name,
+        bullets = excluded.bullets,
+        static_gk = excluded.static_gk,
+        user_notes = excluded.user_notes,
+        original_url = excluded.original_url,
+        one_liner = excluded.one_liner
+    """, (
+        data.article_id,
+        title,
+        category,
+        source_name,
+        bullets,
+        static_gk,
+        data.user_notes or "",
+        exam_targets,
+        original_url,
+        one_liner
+    ))
+    conn.commit()
     conn.close()
     return {"status": "saved", "article_id": data.article_id}
 
@@ -286,6 +294,7 @@ def delete_bookmark(article_id: str):
     conn.commit()
     conn.close()
     return {"status": "deleted", "article_id": article_id}
+
 
 # ==================== INTERACTIVE NOTEPAD ====================
 

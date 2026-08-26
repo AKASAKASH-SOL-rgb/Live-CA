@@ -25,7 +25,7 @@ def init_db():
         exam_targets TEXT NOT NULL, -- JSON array of 'ssc', 'railway', 'banking'
         bullets TEXT NOT NULL,      -- JSON array of 2-3 linear bullet points
         one_liner TEXT NOT NULL,    -- Crisp 1-line exam takeaway
-        static_gk TEXT,             -- JSON object/array of Static GK booster facts (HQ, Year, Chairman, etc.)
+        static_gk TEXT,             -- JSON object/array of Static GK booster facts
         summary_raw TEXT,
         is_featured INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -33,6 +33,7 @@ def init_db():
     """)
 
     # Table for saved/bookmarked facts (My Revision Deck)
+    # Stored independently so bookmarks never disappear
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS bookmarks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,10 +45,22 @@ def init_db():
         static_gk TEXT,
         user_notes TEXT,
         exam_targets TEXT,
-        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (article_id) REFERENCES articles (id) ON DELETE CASCADE
+        original_url TEXT,
+        one_liner TEXT,
+        saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)
+
+    # Ensure existing database columns exist (automatic migration)
+    try:
+        cursor.execute("ALTER TABLE bookmarks ADD COLUMN original_url TEXT;")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE bookmarks ADD COLUMN one_liner TEXT;")
+    except Exception:
+        pass
+
 
     # Table for interactive Notepad custom notes
     cursor.execute("""
@@ -55,7 +68,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
-        tags TEXT, -- JSON array of tags e.g. ["Banking", "SSC", "August 2026"]
+        tags TEXT,
         color TEXT DEFAULT 'indigo',
         is_pinned INTEGER DEFAULT 0,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -70,7 +83,7 @@ def init_db():
         date TEXT NOT NULL,
         score INTEGER NOT NULL,
         total_questions INTEGER NOT NULL,
-        details TEXT, -- JSON string of quiz questions and answers
+        details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """)

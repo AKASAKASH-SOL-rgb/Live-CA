@@ -1,5 +1,119 @@
-// Main Application Logic for Live Current Affairs Web App
+// Main Application Logic for Live Current Affairs Web App (ExamPulse)
 
+// ==================== BOOKMARK & REVISION DECK MANAGER (PERSISTENT) ====================
+class BookmarkManager {
+    constructor() {
+        this.bookmarks = [];
+        this.loadFromStorage();
+    }
+
+    loadFromStorage() {
+        try {
+            const raw = localStorage.getItem('ca_exam_bookmarks');
+            this.bookmarks = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(this.bookmarks)) this.bookmarks = [];
+        } catch (e) {
+            console.error('Error loading bookmarks from localStorage:', e);
+            this.bookmarks = [];
+        }
+    }
+
+    saveToStorage() {
+        try {
+            localStorage.setItem('ca_exam_bookmarks', JSON.stringify(this.bookmarks));
+        } catch (e) {
+            console.error('Error saving bookmarks to localStorage:', e);
+        }
+    }
+
+    getAll() {
+        return this.bookmarks;
+    }
+
+    isSaved(articleId, title) {
+        if (!articleId && !title) return false;
+        const normTitle = title ? title.trim().toLowerCase() : "";
+        return this.bookmarks.some(b => {
+            const matchId = (b.article_id && b.article_id === articleId) || (b.id && b.id === articleId);
+            const matchTitle = normTitle && b.title && b.title.trim().toLowerCase() === normTitle;
+            return matchId || matchTitle;
+        });
+    }
+
+    add(article, userNotes = "") {
+        if (!article) return;
+        const artId = article.id || article.article_id || ('bm_' + Date.now());
+
+        if (this.isSaved(artId, article.title)) {
+            return;
+        }
+
+        const bookmarkItem = {
+            id: artId,
+            article_id: artId,
+            title: article.title,
+            category: article.category || "General Awareness",
+            source_name: article.source_name || "Live Feed",
+            bullets: article.bullets || [],
+            static_gk: article.static_gk || [],
+            user_notes: userNotes || article.user_note || article.user_notes || "",
+            exam_targets: article.exam_targets || [],
+            original_url: article.original_url || "",
+            one_liner: article.one_liner || (article.bullets && article.bullets[0]) || article.title,
+            saved_at: new Date().toISOString()
+        };
+
+        this.bookmarks.unshift(bookmarkItem);
+        this.saveToStorage();
+
+        // Asynchronously sync with backend
+        window.api.saveBookmark(bookmarkItem, userNotes).catch(err => {
+            console.warn('Background server bookmark sync notice:', err);
+        });
+    }
+
+    remove(articleId, title) {
+        const normTitle = title ? title.trim().toLowerCase() : "";
+        this.bookmarks = this.bookmarks.filter(b => {
+            const matchId = (b.article_id && b.article_id === articleId) || (b.id && b.id === articleId);
+            const matchTitle = normTitle && b.title && b.title.trim().toLowerCase() === normTitle;
+            return !(matchId || matchTitle);
+        });
+        this.saveToStorage();
+
+        // Asynchronously remove on backend
+        if (articleId) {
+            window.api.deleteBookmark(articleId).catch(err => {
+                console.warn('Background server delete bookmark notice:', err);
+            });
+        }
+    }
+
+    async syncWithBackend() {
+        try {
+            const data = await window.api.getBookmarks();
+            const serverBookmarks = data.bookmarks || [];
+
+            if (serverBookmarks.length > 0) {
+                for (const sBm of serverBookmarks) {
+                    if (!this.isSaved(sBm.article_id, sBm.title)) {
+                        this.bookmarks.push(sBm);
+                    }
+                }
+                this.saveToStorage();
+            } else if (this.bookmarks.length > 0) {
+                // Server restarted / empty DB; push local bookmarks to server so server catches up
+                for (const bm of this.bookmarks) {
+                    window.api.saveBookmark(bm).catch(() => {});
+                }
+            }
+        } catch (e) {
+            console.warn('Server bookmarks sync notice (using local storage):', e);
+        }
+    }
+}
+
+// Global Application State
 let state = {
     examTarget: 'all',
     category: 'All Categories',
@@ -9,7 +123,6 @@ let state = {
     activeTab: 'live-feed',
     articles: [],
     oneLiners: [],
-    bookmarks: [],
     isSpeaking: false,
     currentSpeechUtterance: null
 };
@@ -17,13 +130,13 @@ let state = {
 // Initialize Application
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
+    window.bookmarkManager = new BookmarkManager();
     window.notepad = new NotepadManager();
     window.quizEngine = new QuizEngine();
 
     await loadInitialData();
     setupEventListeners();
-    
-    // Initialize Lucide icons
+
     if (window.lucide) {
         window.lucide.createIcons();
     }
@@ -55,24 +168,28 @@ function updateThemeIcon() {
 }
 
 async function loadInitialData() {
-    await updateStatusHeader();
+    updateStatusHeader();
     await fetchAndRenderArticles();
     await window.notepad.init();
+    // Sync bookmarks in background without blocking initial paint
+    window.bookmarkManager.syncWithBackend().then(() => {
+        updateStatusHeader();
+    });
 }
 
-async function updateStatusHeader() {
-    try {
-        const status = await window.api.getStatus();
+function updateStatusHeader() {
+    const deckCountEl = document.getElementById('deck-count-badge');
+    if (deckCountEl && window.bookmarkManager) {
+        deckCountEl.textContent = window.bookmarkManager.getAll().length;
+    }
+
+    window.api.getStatus().then(status => {
         const syncEl = document.getElementById('last-sync-time');
         const badgeEl = document.getElementById('total-articles-count');
-        const deckCountEl = document.getElementById('deck-count-badge');
 
         if (syncEl) syncEl.textContent = status.last_sync || 'Live Today';
-        if (badgeEl) badgeEl.textContent = `${status.total_articles} Facts`;
-        if (deckCountEl) deckCountEl.textContent = status.total_saved || 0;
-    } catch (e) {
-        console.error('Status fetch error:', e);
-    }
+        if (badgeEl) badgeEl.textContent = `${status.total_articles || state.articles.length} Facts`;
+    }).catch(e => console.warn('Status poll note:', e));
 }
 
 // ==================== ARTICLES & FEED ====================
@@ -99,6 +216,12 @@ async function fetchAndRenderArticles() {
         });
 
         state.articles = data.articles || [];
+
+        // Check each article against BookmarkManager so is_saved is ALWAYS accurate
+        state.articles.forEach(art => {
+            art.is_saved = window.bookmarkManager.isSaved(art.id, art.title);
+        });
+
         renderArticles();
     } catch (e) {
         console.error('Fetch articles error:', e);
@@ -169,10 +292,10 @@ function renderArticles() {
             `;
         }
 
-        const safeArticleJson = encodeURIComponent(JSON.stringify(art));
+        const isSaved = window.bookmarkManager.isSaved(art.id, art.title);
 
         return `
-            <article class="glass-card hover-lift rounded-3xl p-5 md:p-6 mb-4 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-fluid">
+            <article class="glass-card hover-lift rounded-3xl p-5 md:p-6 mb-4 border border-slate-200/80 dark:border-slate-800 shadow-sm transition-fluid" id="card-${art.id}">
                 <!-- Card Header -->
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div class="flex items-center gap-2 flex-wrap">
@@ -214,16 +337,16 @@ function renderArticles() {
                             class="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5" title="Listen Audio">
                             🔊 <span class="hidden sm:inline text-[11px] font-semibold">Listen</span>
                         </button>
-                        <button onclick="window.notepad.appendFromArticle(JSON.parse(decodeURIComponent('${safeArticleJson}')))" 
+                        <button onclick="addToNotepadById('${art.id}')" 
                             class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-bold transition-fluid flex items-center gap-1.5" title="Add to Notepad">
                             📓 + Add to Notepad
                         </button>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="toggleBookmark('${art.id}', '${safeArticleJson}')" 
+                        <button onclick="toggleBookmark('${art.id}')" 
                             id="bookmark-btn-${art.id}"
-                            class="px-3.5 py-1.5 rounded-xl border ${art.is_saved ? 'bg-amber-500 text-white border-amber-600' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'} font-bold transition-fluid flex items-center gap-1.5 shadow-sm">
-                            ${art.is_saved ? '⭐ Saved' : '☆ Save Fact'}
+                            class="px-3.5 py-1.5 rounded-xl border ${isSaved ? 'bg-amber-500 text-white border-amber-600' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'} font-bold transition-fluid flex items-center gap-1.5 shadow-sm">
+                            ${isSaved ? '⭐ Saved' : '☆ Save Fact'}
                         </button>
                         ${art.original_url ? `
                             <a href="${art.original_url}" target="_blank" class="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400" title="Source Article">
@@ -237,6 +360,154 @@ function renderArticles() {
     }).join('');
 
     if (window.lucide) window.lucide.createIcons();
+}
+
+// ==================== BOOKMARKS TOGGLE & PERSISTENCE ====================
+
+function toggleBookmark(articleId) {
+    const art = state.articles.find(a => a.id === articleId);
+    if (!art) return;
+
+    const isCurrentlySaved = window.bookmarkManager.isSaved(art.id, art.title);
+
+    if (isCurrentlySaved) {
+        window.bookmarkManager.remove(art.id, art.title);
+        art.is_saved = false;
+        updateBookmarkBtn(articleId, false);
+        showToast('Removed from Saved Deck.');
+    } else {
+        window.bookmarkManager.add(art);
+        art.is_saved = true;
+        updateBookmarkBtn(articleId, true);
+        showToast('Saved to Revision Deck! ⭐');
+    }
+
+    updateStatusHeader();
+
+    if (state.activeTab === 'saved-deck') {
+        renderBookmarks();
+    }
+}
+
+function updateBookmarkBtn(articleId, isSaved) {
+    const btn = document.getElementById(`bookmark-btn-${articleId}`);
+    if (btn) {
+        if (isSaved) {
+            btn.className = 'px-3.5 py-1.5 rounded-xl border bg-amber-500 text-white border-amber-600 font-bold transition-fluid flex items-center gap-1.5 shadow-sm';
+            btn.innerHTML = '⭐ Saved';
+        } else {
+            btn.className = 'px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold transition-fluid flex items-center gap-1.5 shadow-sm';
+            btn.innerHTML = '☆ Save Fact';
+        }
+    }
+}
+
+function addToNotepadById(articleId) {
+    const art = state.articles.find(a => a.id === articleId);
+    if (art && window.notepad) {
+        window.notepad.appendFromArticle(art);
+    }
+}
+
+// ==================== REVISION DECK LAYER ====================
+
+async function loadBookmarks() {
+    const container = document.getElementById('bookmarks-container');
+    if (!container) return;
+
+    // Immediately render from local BookmarkManager (no loading lag!)
+    renderBookmarks();
+
+    // Background sync with server
+    window.bookmarkManager.syncWithBackend().then(() => {
+        renderBookmarks();
+        updateStatusHeader();
+    });
+}
+
+function renderBookmarks() {
+    const container = document.getElementById('bookmarks-container');
+    if (!container) return;
+
+    const bookmarks = window.bookmarkManager.getAll();
+
+    if (bookmarks.length === 0) {
+        container.innerHTML = `
+            <div class="p-12 text-center glass-card rounded-3xl border border-slate-200/80 dark:border-slate-800 max-w-lg mx-auto">
+                <div class="w-16 h-16 mx-auto mb-3 bg-amber-50 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-2xl">⭐</div>
+                <h3 class="text-base font-bold text-slate-800 dark:text-slate-200">Your Revision Deck is Empty</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Click "☆ Save Fact" on any current affairs card to bookmark it for rapid last-minute revision.</p>
+                <button onclick="window.switchTab('live-feed')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Browse Live Feed</button>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-sm font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                ⭐ Saved Revision Deck (${bookmarks.length} Facts)
+            </h3>
+            <div class="flex items-center gap-2">
+                <button onclick="exportDeckAsJSON()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-fluid flex items-center gap-1">
+                    💾 Backup Deck
+                </button>
+                <button onclick="window.print()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-fluid">
+                    🖨️ Export PDF
+                </button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${bookmarks.map(bm => {
+                const bmId = bm.article_id || bm.id;
+                const safeTitle = escapeHtml(bm.title);
+                return `
+                    <div class="glass-card p-5 rounded-3xl border border-amber-200/80 dark:border-amber-900/40 shadow-sm hover-lift transition-fluid flex flex-col justify-between" id="bm-card-${bmId}">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">
+                                    ${bm.category}
+                                </span>
+                                <button onclick="removeBookmarkFromDeck('${bmId}', '${safeTitle}')" class="text-slate-400 hover:text-red-500 text-xs font-bold" title="Remove">
+                                    ✕ Remove
+                                </button>
+                            </div>
+                            <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 leading-snug">
+                                ${safeTitle}
+                            </h4>
+                            <ul class="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 mb-3">
+                                ${(bm.bullets || []).map(b => `<li class="flex items-start gap-1.5"><span class="text-amber-500 font-bold">•</span><span>${escapeHtml(b)}</span></li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                            <span>Saved on ${new Date(bm.saved_at || Date.now()).toLocaleDateString()}</span>
+                            <button onclick="window.notepad.appendFromArticle(${JSON.stringify(bm).replace(/"/g, '&quot;')})" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
+                                + Add to Notes
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function removeBookmarkFromDeck(articleId, title) {
+    window.bookmarkManager.remove(articleId, title);
+    showToast('Removed fact from deck.');
+    updateStatusHeader();
+    renderBookmarks();
+    updateBookmarkBtn(articleId, false);
+}
+
+function exportDeckAsJSON() {
+    const data = JSON.stringify(window.bookmarkManager.getAll(), null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `exampulse_saved_deck_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    showToast('Backup saved to your device! 💾');
 }
 
 // ==================== ONE-LINERS LAYER ====================
@@ -305,109 +576,6 @@ function readAllOneLiners() {
     toggleSpeech(text);
 }
 
-// ==================== BOOKMARKS / REVISION DECK ====================
-
-async function loadBookmarks() {
-    const container = document.getElementById('bookmarks-container');
-    if (!container) return;
-
-    container.innerHTML = `
-        <div class="p-12 text-center text-slate-400">
-            <div class="inline-block animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mb-3"></div>
-            <p class="text-sm font-semibold">Loading your saved Revision Deck...</p>
-        </div>
-    `;
-
-    try {
-        const data = await window.api.getBookmarks();
-        state.bookmarks = data.bookmarks || [];
-        renderBookmarks();
-    } catch (e) {
-        console.error('Bookmarks load error:', e);
-    }
-}
-
-function renderBookmarks() {
-    const container = document.getElementById('bookmarks-container');
-    if (!container) return;
-
-    if (state.bookmarks.length === 0) {
-        container.innerHTML = `
-            <div class="p-12 text-center glass-card rounded-3xl border border-slate-200/80 dark:border-slate-800 max-w-lg mx-auto">
-                <div class="w-16 h-16 mx-auto mb-3 bg-amber-50 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-2xl">⭐</div>
-                <h3 class="text-base font-bold text-slate-800 dark:text-slate-200">Your Revision Deck is Empty</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Click "☆ Save Fact" on any current affairs card to bookmark it for rapid last-minute revision.</p>
-                <button onclick="window.switchTab('live-feed')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Browse Live Feed</button>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-sm font-extrabold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                ⭐ Saved Revision Deck (${state.bookmarks.length} Facts)
-            </h3>
-            <button onclick="window.print()" class="px-3 py-1.5 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-fluid">
-                🖨️ Export Deck
-            </button>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${state.bookmarks.map(bm => `
-                <div class="glass-card p-5 rounded-3xl border border-amber-200/80 dark:border-amber-900/40 shadow-sm hover-lift transition-fluid flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between gap-2 mb-2">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">
-                                ${bm.category}
-                            </span>
-                            <button onclick="removeBookmark('${bm.article_id}')" class="text-slate-400 hover:text-red-500 text-xs font-bold" title="Remove">
-                                ✕ Remove
-                            </button>
-                        </div>
-                        <h4 class="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 leading-snug">
-                            ${escapeHtml(bm.title)}
-                        </h4>
-                        <ul class="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 mb-3">
-                            ${(bm.bullets || []).map(b => `<li class="flex items-start gap-1.5"><span class="text-amber-500 font-bold">•</span><span>${escapeHtml(b)}</span></li>`).join('')}
-                        </ul>
-                    </div>
-                    <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Saved on ${new Date(bm.saved_at).toLocaleDateString()}</span>
-                        <button onclick="window.notepad.appendFromArticle(${JSON.stringify(bm).replace(/"/g, '&quot;')})" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
-                            + Add to Notes
-                        </button>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-async function toggleBookmark(articleId, safeArticleJson) {
-    const art = JSON.parse(decodeURIComponent(safeArticleJson));
-    const btn = document.getElementById(`bookmark-btn-${articleId}`);
-
-    if (art.is_saved) {
-        await window.api.deleteBookmark(articleId);
-        art.is_saved = false;
-        showToast('Removed from Saved Deck.');
-    } else {
-        await window.api.saveBookmark(articleId, "");
-        art.is_saved = true;
-        showToast('Saved to Revision Deck! ⭐');
-    }
-
-    await updateStatusHeader();
-    await fetchAndRenderArticles();
-}
-
-async function removeBookmark(articleId) {
-    await window.api.deleteBookmark(articleId);
-    showToast('Removed fact from deck.');
-    await updateStatusHeader();
-    await loadBookmarks();
-}
-
 // ==================== LIVE SYNC & REFRESH ====================
 
 async function handleLiveSync() {
@@ -419,11 +587,12 @@ async function handleLiveSync() {
 
     try {
         const res = await window.api.triggerSync();
-        showToast(`Sync complete! Loaded ${res.details?.count || 'new'} fresh current affairs. 🚀`);
-        await updateStatusHeader();
+        showToast(`Sync complete! Loaded fresh current affairs. 🚀`);
+        updateStatusHeader();
         await fetchAndRenderArticles();
     } catch (e) {
-        showToast('Sync error. Using cached articles.');
+        showToast('Sync updated from live cache.');
+        await fetchAndRenderArticles();
     } finally {
         if (syncBtn) {
             syncBtn.disabled = false;
@@ -489,17 +658,15 @@ window.showToast = showToast;
 function switchTab(tabId) {
     state.activeTab = tabId;
 
-    // Update Tab Buttons
     document.querySelectorAll('.nav-tab-btn').forEach(btn => {
         const target = btn.dataset.tab;
         if (target === tabId) {
-            btn.className = 'nav-tab-btn px-4 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-md transition-fluid flex items-center gap-2';
+            btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-md transition-fluid flex items-center gap-1.5';
         } else {
-            btn.className = 'nav-tab-btn px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-2';
+            btn.className = 'nav-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-fluid flex items-center gap-1.5';
         }
     });
 
-    // Toggle Content Views
     document.querySelectorAll('.tab-content-view').forEach(view => {
         view.classList.add('hidden');
     });
@@ -509,7 +676,6 @@ function switchTab(tabId) {
         activeView.classList.remove('hidden');
     }
 
-    // Tab Specific Fetchers
     if (tabId === 'one-liners') {
         loadOneLiners();
     } else if (tabId === 'saved-deck') {
@@ -532,9 +698,9 @@ function setExamFilter(examId) {
     document.querySelectorAll('.exam-filter-btn').forEach(btn => {
         const target = btn.dataset.exam;
         if (target === examId) {
-            btn.className = 'exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md transition-fluid flex items-center gap-1.5';
+            btn.className = 'exam-filter-btn px-3 py-1 rounded-full text-xs font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md transition-fluid';
         } else {
-            btn.className = 'exam-filter-btn px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid flex items-center gap-1.5';
+            btn.className = 'exam-filter-btn px-3 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-400 bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700 transition-fluid';
         }
     });
 
